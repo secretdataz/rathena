@@ -71,7 +71,26 @@ void vending_closevending(struct map_session_data* sd)
 void vending_vendinglistreq(struct map_session_data* sd, int id)
 {
 	struct map_session_data* vsd;
+	struct npc_data *nd_sd;
 	nullpo_retv(sd);
+
+	if (nd_sd = (TBL_NPC*)map_id2bl(id)) {
+		if (nd_sd->vend.vends == true) {
+			char event_name[64 + 23 + 1];
+			if (nd_sd->subtype == NPCTYPE_CASHSHOP) {
+				npc_click(sd, nd_sd);
+			}
+			if (nd_sd->subtype == NPCTYPE_SHOP) {
+				npc_buysellsel(sd, nd_sd->bl.id, 0);
+			}
+			if (nd_sd->subtype == NPCTYPE_SCRIPT) {
+				sprintf(event_name, "%s::OnVendingClick", &nd_sd->name);
+				npc_event(sd, event_name, 0);
+			}
+			return;
+		}
+		return;
+	}
 
 	if( (vsd = map_id2sd(id)) == NULL )
 		return;

@@ -90,6 +90,11 @@ struct npc_data {
 			char killer_name[NAME_LENGTH];
 		} tomb;
 	} u;
+
+	struct {
+		char vending[NAME_LENGTH + 1];
+		bool vends;
+	} vend;
 };
 
 #define START_NPC_NUM 110000000

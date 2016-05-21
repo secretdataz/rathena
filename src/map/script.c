@@ -21060,6 +21060,47 @@ BUILDIN_FUNC(opendressroom)
 #endif
 }
 
+BULDIN_FUNC(showvend) {
+	struct npc_data *nd;
+	const char *message;
+	const char *name;
+	unsigned char buf[NAME_LENGTH + 1];
+	int flag;
+	
+	name = script_getstr(st, 2);m
+	flag = script_getnum(st, 3);
+	
+	if (flag && !script_hasdata(st, 4)) {
+		ShowError("buildin_showvend: Wanted to create vending board without name.\n");
+		script_reportsrc(st);
+		st->state = END;
+		return SCRIPT_CMD_FAILURE;
+	}
+	else if (flag) {
+		message = script_getstr(st, 4);
+	}
+	nd = npc_name2id(name);
+	if (nd == NULL) {
+		ShowError("buildin_showvend: No NPC found!\n");
+		script_pushint(st, 0);
+		return SCRIPT_CMD_FAILURE;
+	}
+	switch (flag) {
+	case 0:
+		clif_closevendingboard(&nd->bl, 0);
+		nd->vend.vends = false;
+		break;
+	default:
+		memcpy(buf, message, NAME_LENGTH + 1);
+		clif_showvendingboard(&nd->bl, (const char*)buf, 0);
+		nd->vend.vends = true;
+		memcpy(nd->vend.vending, message, NAME_LENGTH + 1);
+		break;
+	}
+	script_pushint(st, 1);
+	return SCRIPT_CMD_SUCCESS;
+}
+
 /**
  * navigateto("<map>"{,<x>,<y>,<flag>,<hide_window>,<monster_id>,<char_id>});
  */
@@ -21883,6 +21924,7 @@ struct script_function buildin_func[] = {
 	BUILDIN_DEF(opendressroom,"i?"),
 	BUILDIN_DEF(navigateto,"s???????"),
 	BUILDIN_DEF(adopt,"vv"),
+	BUILDIN_DEF(showvend,"si?"),
 	BUILDIN_DEF(getexp2,"ii?"),
 
 #include "../custom/script_def.inc"
