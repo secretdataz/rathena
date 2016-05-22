@@ -21060,14 +21060,14 @@ BUILDIN_FUNC(opendressroom)
 #endif
 }
 
-BULDIN_FUNC(showvend) {
+BUILDIN_FUNC(showvend) {
 	struct npc_data *nd;
 	const char *message;
 	const char *name;
 	unsigned char buf[NAME_LENGTH + 1];
 	int flag;
 	
-	name = script_getstr(st, 2);m
+	name = script_getstr(st, 2);
 	flag = script_getnum(st, 3);
 	
 	if (flag && !script_hasdata(st, 4)) {
