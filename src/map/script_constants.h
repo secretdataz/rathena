@@ -405,6 +405,7 @@
 	export_constant(MF_NOLOCKON);
 	export_constant(MF_NOTOMB);
 	export_constant(MF_SKILL_DAMAGE);
+	export_constant(MF_AFK);
 	export_constant(MF_NOCOSTUME);
 	export_constant(MF_GVG_TE_CASTLE);
 	export_constant(MF_GVG_TE);
