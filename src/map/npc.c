@@ -4115,6 +4115,8 @@ static const char* npc_parse_mapflag(char* w1, char* w2, char* w3, char* w4, con
 		map[m].flag.nolockon = state;
 	else if (!strcmpi(w3,"notomb"))
 		map[m].flag.notomb = state;
+	else if (!strcmpi(w3,"afk"))
+		map[m].flag.afk = state;
 	else if (!strcmpi(w3,"nocostume"))
 		map[m].flag.nocostume = state;
 	else if (!strcmpi(w3,"skill_damage")) {
