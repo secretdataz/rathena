@@ -361,7 +361,8 @@ enum {
 	MF_NOMINEEFFECT,
 	MF_NOLOCKON,
 	MF_NOTOMB,
-	MF_SKILL_DAMAGE	//60
+	MF_SKILL_DAMAGE,	//60
+	MF_NOCOSTUME,
 };
 
 const char* script_op2name(int op)
@@ -9563,6 +9564,7 @@ BUILDIN_FUNC(itemskill)
 {
 	int id;
 	int lv;
+	bool keep_requirement;
 	TBL_PC* sd;
 	struct script_data *data;
 
@@ -9574,9 +9576,15 @@ BUILDIN_FUNC(itemskill)
 	get_val(st, data); // Convert into value in case of a variable
 	id = ( data_isstring(data) ? skill_name2id(script_getstr(st,2)) : script_getnum(st,2) );
 	lv = script_getnum(st,3);
+	if (script_hasdata(st, 4)) {
+		keep_requirement = (script_getnum(st, 4) != 0);
+	} else {
+		keep_requirement = false;
+	}
 
 	sd->skillitem=id;
 	sd->skillitemlv=lv;
+	sd->skillitem_keep_requirement = keep_requirement;
 	clif_item_skill(sd,id,lv);
 	return SCRIPT_CMD_SUCCESS;
 }
@@ -11838,6 +11846,7 @@ BUILDIN_FUNC(getmapflag)
 			case MF_NOMINEEFFECT:		script_pushint(st,map[m].flag.nomineeffect); break;
 			case MF_NOLOCKON:			script_pushint(st,map[m].flag.nolockon); break;
 			case MF_NOTOMB:				script_pushint(st,map[m].flag.notomb); break;
+			case MF_NOCOSTUME:			script_pushint(st,map[m].flag.nocostume); break;
 #ifdef ADJUST_SKILL_DAMAGE
 			case MF_SKILL_DAMAGE:
 				{
@@ -11961,6 +11970,7 @@ BUILDIN_FUNC(setmapflag)
 			case MF_NOMINEEFFECT:		map[m].flag.nomineeffect = 1 ; break;
 			case MF_NOLOCKON:			map[m].flag.nolockon = 1 ; break;
 			case MF_NOTOMB:				map[m].flag.notomb = 1; break;
+			case MF_NOCOSTUME:			map[m].flag.nocostume = 1; break;
 #ifdef ADJUST_SKILL_DAMAGE
 			case MF_SKILL_DAMAGE:
 				{
@@ -12072,6 +12082,7 @@ BUILDIN_FUNC(removemapflag)
 			case MF_NOMINEEFFECT:		map[m].flag.nomineeffect = 0 ; break;
 			case MF_NOLOCKON:			map[m].flag.nolockon = 0 ; break;
 			case MF_NOTOMB:				map[m].flag.notomb = 0; break;
+			case MF_NOCOSTUME:			map[m].flag.nocostume = 0; break;
 #ifdef ADJUST_SKILL_DAMAGE
 			case MF_SKILL_DAMAGE:
 				{
@@ -12382,7 +12393,7 @@ BUILDIN_FUNC(getcastledata)
 
 	if (gc == NULL) {
 		script_pushint(st,0);
-		ShowWarning("buildin_setcastledata: guild castle for map '%s' not found\n", mapname);
+		ShowWarning("buildin_getcastledata: guild castle for map '%s' not found\n", mapname);
 		return SCRIPT_CMD_FAILURE;
 	}
 
@@ -12411,7 +12422,7 @@ BUILDIN_FUNC(getcastledata)
 				break;
 			}
 			script_pushint(st,0);
-			ShowWarning("buildin_setcastledata: index = '%d' is out of allowed range\n", index);
+			ShowWarning("buildin_getcastledata: index = '%d' is out of allowed range\n", index);
 			return SCRIPT_CMD_FAILURE;
 	}
 	return SCRIPT_CMD_SUCCESS;
@@ -18646,28 +18657,28 @@ BUILDIN_FUNC(waitingroom2bg)
 	}
 
 	map_name = script_getstr(st,2);
-	if( strcmp(map_name,"-") != 0 )
-	{
-		mapindex = mapindex_name2id(map_name);
-		if( mapindex == 0 )
-		{ // Invalid Map
-			script_pushint(st,0);
-			return SCRIPT_CMD_SUCCESS;
-		}
+	if (strcmp(map_name, "-") != 0 && (mapindex = mapindex_name2id(map_name)) == 0)
+	{ // Invalid Map
+		script_pushint(st, 0);
+		return SCRIPT_CMD_SUCCESS;
 	}
 
 	x = script_getnum(st,3);
 	y = script_getnum(st,4);
-	ev = script_getstr(st,5); // Logout Event
-	dev = script_getstr(st,6); // Die Event
+	if(script_hasdata(st,5))
+		ev = script_getstr(st,5); // Logout Event
+	if(script_hasdata(st,6))
+		dev = script_getstr(st,6); // Die Event
+
+	check_event(st, ev);
+	check_event(st, dev);
 
 	if( (bg_id = bg_create(mapindex, x, y, ev, dev)) == 0 )
 	{ // Creation failed
 		script_pushint(st,0);
 		return SCRIPT_CMD_SUCCESS;
 	}
-
-        
+	
 	for (i = 0; i < cd->users; i++) { // Only add those who are in the chat room
 		struct map_session_data *sd;
 		if( (sd = cd->usersd[i]) != NULL && bg_team_join(bg_id, sd) ){
@@ -18687,15 +18698,29 @@ BUILDIN_FUNC(waitingroom2bg_single)
 	struct npc_data *nd;
 	struct chat_data *cd;
 	struct map_session_data *sd;
+	struct battleground_data *bg;
 	int x, y, mapindex, bg_id;
 
 	bg_id = script_getnum(st,2);
-	map_name = script_getstr(st,3);
-	if( (mapindex = mapindex_name2id(map_name)) == 0 )
-		return SCRIPT_CMD_SUCCESS; // Invalid Map
+	if ((bg = bg_team_search(bg_id)) == NULL) {
+		script_pushint(st, false);
+		return SCRIPT_CMD_SUCCESS;
+	}
+	if (script_hasdata(st, 3)) {
+		map_name = script_getstr(st, 3);
+		if ((mapindex = mapindex_name2id(map_name)) == 0) {
+			script_pushint(st, false);
+			return SCRIPT_CMD_SUCCESS; // Invalid Map
+		}
+		x = script_getnum(st, 4);
+		y = script_getnum(st, 5);
+	}
+	else {
+		mapindex = bg->mapindex;
+		x = bg->x;
+		y = bg->y;
+	}
 
-	x = script_getnum(st,4);
-	y = script_getnum(st,5);
 	nd = npc_name2id(script_getstr(st,6));
 
 	if( nd == NULL || (cd = (struct chat_data *)map_id2bl(nd->chat_id)) == NULL || cd->users <= 0 )
@@ -18704,13 +18729,86 @@ BUILDIN_FUNC(waitingroom2bg_single)
 	if( (sd = cd->usersd[0]) == NULL )
 		return SCRIPT_CMD_SUCCESS;
 
-	if( bg_team_join(bg_id, sd) )
+	if( bg_team_join(bg_id, sd) && pc_setpos(sd, mapindex, x, y, CLR_TELEPORT) == SETPOS_OK)
 	{
-		pc_setpos(sd, mapindex, x, y, CLR_TELEPORT);
-		script_pushint(st,1);
+		script_pushint(st, true);
 	}
 	else
-		script_pushint(st,0);
+		script_pushint(st, false);
+
+	return SCRIPT_CMD_SUCCESS;
+}
+
+
+/// Creates an instance of battleground battle group.
+/// *bg_create("<map name>",<x>,<y>{,"<On Quit Event>","<On Death Event>"});
+/// @author [secretdataz]
+BUILDIN_FUNC(bg_create) {
+	const char *map_name, *ev = "", *dev = "";
+	int x, y, mapindex = 0;
+
+	map_name = script_getstr(st, 2);
+	if (strcmp(map_name, "-") != 0 && (mapindex = mapindex_name2id(map_name)) == 0)
+	{ // Invalid Map
+		script_pushint(st, 0);
+		return SCRIPT_CMD_SUCCESS;
+	}
+
+	x = script_getnum(st, 3);
+	y = script_getnum(st, 4);
+	if(script_hasdata(st, 5))
+		ev = script_getstr(st, 5); // Logout Event
+	if(script_hasdata(st, 6))
+		dev = script_getstr(st, 6); // Die Event
+
+	check_event(st, ev);
+	check_event(st, dev);
+
+	script_pushint(st, bg_create(mapindex, x, y, ev, dev));
+	return SCRIPT_CMD_SUCCESS;
+}
+
+/// Adds attached player or <char id> (if specified) to an existing 
+/// battleground group and warps it to the specified coordinates on
+/// the given map.
+/// bg_join(<battle group>,{"<map name>",<x>,<y>{,<char id>}});
+/// @author [secretdataz]
+BUILDIN_FUNC(bg_join) {
+	const char* map_name;
+	struct map_session_data *sd;
+	struct battleground_data *bg;
+	int x, y, bg_id, mapindex;
+
+	bg_id = script_getnum(st, 2);
+	if ((bg = bg_team_search(bg_id)) == NULL) {
+		script_pushint(st, false);
+		return SCRIPT_CMD_SUCCESS;
+	}
+	if (script_hasdata(st, 3)) {
+		map_name = script_getstr(st, 3);
+		if ((mapindex = mapindex_name2id(map_name)) == 0) {
+			script_pushint(st, false);
+			return SCRIPT_CMD_SUCCESS; // Invalid Map
+		}
+		x = script_getnum(st, 4);
+		y = script_getnum(st, 5);
+	} else {
+		mapindex = bg->mapindex;
+		x = bg->x;
+		y = bg->y;
+	}
+
+	if (!script_charid2sd(6, sd)) {
+		script_pushint(st, false);
+		return SCRIPT_CMD_FAILURE;
+	}
+
+	if (bg_team_join(bg_id, sd) && pc_setpos(sd, mapindex, x, y, CLR_TELEPORT) == SETPOS_OK)
+	{
+		script_pushint(st, true);
+	}
+	else
+		script_pushint(st, false);
 
 	return SCRIPT_CMD_SUCCESS;
 }
@@ -21493,6 +21591,114 @@ BUILDIN_FUNC(getexp2) {
 	return SCRIPT_CMD_SUCCESS;
 }
 
+/*==========================================
+* Costume Items
+*------------------------------------------*/
+BUILDIN_FUNC(costume)
+{
+	int i = -1, num, ep;
+	TBL_PC *sd;
+
+	num = script_getnum(st, 2); // Equip Slot
+	sd = script_rid2sd(st);
+
+	if (sd == NULL)
+		return SCRIPT_CMD_FAILURE;
+	if (equip_index_check(num))
+		i = pc_checkequip(sd, equip_bitmask[num]);
+	if (i < 0)
+		return SCRIPT_CMD_FAILURE;
+
+	ep = sd->status.inventory[i].equip;
+	if (!(ep&EQP_HEAD_LOW) && !(ep&EQP_HEAD_MID) && !(ep&EQP_HEAD_TOP) && !(ep&EQP_GARMENT)) {
+		ShowError("buildin_costume: Attempted to convert non-cosmetic item to costume.");
+		return SCRIPT_CMD_FAILURE;
+	}
+	log_pick_pc(sd, LOG_TYPE_SCRIPT, -1, &sd->status.inventory[i]);
+	pc_unequipitem(sd, i, 2);
+	clif_delitem(sd, i, 1, 3);
+	// --------------------------------------------------------------------
+	sd->status.inventory[i].refine = 0;
+	sd->status.inventory[i].attribute = 0;
+	sd->status.inventory[i].card[0] = CARD0_CREATE;
+	sd->status.inventory[i].card[1] = 0;
+	sd->status.inventory[i].card[2] = GetWord(battle_config.reserved_costume_id, 0);
+	sd->status.inventory[i].card[3] = GetWord(battle_config.reserved_costume_id, 1);
+
+	if (ep&EQP_HEAD_TOP) { ep &= ~EQP_HEAD_TOP; ep |= EQP_COSTUME_HEAD_TOP; }
+	if (ep&EQP_HEAD_LOW) { ep &= ~EQP_HEAD_LOW; ep |= EQP_COSTUME_HEAD_LOW; }
+	if (ep&EQP_HEAD_MID) { ep &= ~EQP_HEAD_MID; ep |= EQP_COSTUME_HEAD_MID; }
+	if (ep&EQP_GARMENT) { ep &= EQP_GARMENT; ep |= EQP_COSTUME_GARMENT; }
+	// --------------------------------------------------------------------
+	log_pick_pc(sd, LOG_TYPE_SCRIPT, 1, &sd->status.inventory[i]);
+
+	clif_additem(sd, i, 1, 0);
+	pc_equipitem(sd, i, ep);
+	clif_misceffect(&sd->bl, 3);
+
+	return SCRIPT_CMD_SUCCESS;
+}
+
+/*===============================
+ * getcostumeitem <item id>;
+ * getcostumeitem <"item name">;
+ *===============================*/
+BUILDIN_FUNC(getcostumeitem)
+{
+	unsigned short nameid;
+	struct item item_tmp;
+	TBL_PC *sd;
+	struct script_data *data;
+
+	sd = script_rid2sd(st);
+	if (sd == NULL)
+	{	// No player attached.
+		script_pushint(st, 0);
+		return SCRIPT_CMD_SUCCESS;
+	}
+
+	data = script_getdata(st, 2);
+	get_val(st, data);
+	if (data_isstring(data)) {
+		const char *name = conv_str(st, data);
+		struct item_data *item_data = itemdb_searchname(name);
+		if (item_data == NULL)
+		{	//Failed
+			script_pushint(st, 0);
+			return SCRIPT_CMD_SUCCESS;
+		}
+		int ep = item_data->equip;
+		if (!(ep&EQP_HEAD_LOW) && !(ep&EQP_HEAD_MID) && !(ep&EQP_HEAD_TOP) && !(ep&EQP_GARMENT)){
+			ShowError("buildin_getcostumeitem: Attempted to convert non-cosmetic item to costume.");
+			return SCRIPT_CMD_FAILURE;
+		}
+		nameid = item_data->nameid;
+	}
+	else
+		nameid = conv_num(st, data);
+
+	if (!itemdb_exists(nameid))
+	{	// Item does not exist.
+		script_pushint(st, 0);
+		return SCRIPT_CMD_SUCCESS;
+	}
+
+	memset(&item_tmp, 0, sizeof(item_tmp));
+	item_tmp.nameid = nameid;
+	item_tmp.amount = 1;
+	item_tmp.identify = 1;
+	item_tmp.card[0] = CARD0_CREATE;
+	item_tmp.card[2] = GetWord(battle_config.reserved_costume_id, 0);
+	item_tmp.card[3] = GetWord(battle_config.reserved_costume_id, 1);
+	if (pc_additem(sd, &item_tmp, 1, LOG_TYPE_SCRIPT)) {
+		script_pushint(st, 0);
+		return SCRIPT_CMD_SUCCESS;	//Failed to add item, we will not drop if they don't fit
+	}
+
+	script_pushint(st, 1);
+	return SCRIPT_CMD_SUCCESS;
+}
+
 /**
 * Force stat recalculation of sd
 * recalculatestat;
@@ -21916,7 +22122,7 @@ struct script_function buildin_func[] = {
 	BUILDIN_DEF(gettimestr,"si"),
 	BUILDIN_DEF(openstorage,""),
 	BUILDIN_DEF(guildopenstorage,""),
-	BUILDIN_DEF(itemskill,"vi"),
+	BUILDIN_DEF(itemskill,"vi?"),
 	BUILDIN_DEF(produce,"i"),
 	BUILDIN_DEF(cooking,"i"),
 	BUILDIN_DEF(monster,"siisii???"),
@@ -22210,8 +22416,8 @@ struct script_function buildin_func[] = {
 	BUILDIN_DEF(agitend2,""),
 	BUILDIN_DEF(agitcheck2,""),
 	// BattleGround
-	BUILDIN_DEF(waitingroom2bg,"siiss?"),
-	BUILDIN_DEF(waitingroom2bg_single,"isiis"),
+	BUILDIN_DEF(waitingroom2bg,"sii???"),
+	BUILDIN_DEF(waitingroom2bg_single,"i????"),
 	BUILDIN_DEF(bg_team_setxy,"iii"),
 	BUILDIN_DEF(bg_warp,"isii"),
 	BUILDIN_DEF(bg_monster,"isiisi?"),
@@ -22222,6 +22428,8 @@ struct script_function buildin_func[] = {
 	BUILDIN_DEF(bg_get_data,"ii"),
 	BUILDIN_DEF(bg_getareausers,"isiiii"),
 	BUILDIN_DEF(bg_updatescore,"sii"),
+	BUILDIN_DEF(bg_join,"i????"),
+	BUILDIN_DEF(bg_create,"sii??"),
 
 	// Instancing
 	BUILDIN_DEF(instance_create,"s??"),
@@ -22318,6 +22526,8 @@ struct script_function buildin_func[] = {
 	BUILDIN_DEF(navigateto,"s???????"),
 	BUILDIN_DEF(adopt,"vv"),
 	BUILDIN_DEF(getexp2,"ii?"),
+	BUILDIN_DEF(costume, "i"),
+	BUILDIN_DEF(getcostumeitem, "v"),
 	BUILDIN_DEF(recalculatestat,""),
 	BUILDIN_DEF(hateffect,"ii"),
 	BUILDIN_DEF(getrandomoptinfo, "i"),

@@ -610,6 +610,7 @@ extern struct Battle_Config
 	int exp_cost_inspiration;
 	int mvp_exp_reward_message;
 	int can_damage_skill; //Which BL types can damage traps
+	int reserved_costume_id;
 	int atcommand_levelup_events;
 	int block_account_in_same_party;
 
