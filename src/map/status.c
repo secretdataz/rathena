@@ -3279,6 +3279,8 @@ int status_calc_pc_(struct map_session_data* sd, enum e_status_calc_opt opt)
 			continue;
 		if (!sd->inventory_data[index])
 			continue;
+		if (sd->status.inventory[current_equip_item_index].card[0] == CARD0_CREATE && MakeDWord(sd->status.inventory[current_equip_item_index].card[2], sd->status.inventory[current_equip_item_index].card[3]) == battle_config.reserved_costume_id)
+			continue;
 
 		base_status->def += sd->inventory_data[index]->def;
 
