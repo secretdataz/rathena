@@ -91,6 +91,11 @@ struct npc_data {
 			int spawn_timer;
 		} tomb;
 	} u;
+
+	struct {
+		char vending[NAME_LENGTH + 1];
+		bool vends;
+	} vend;
 };
 
 #define START_NPC_NUM 110000000

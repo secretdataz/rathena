@@ -4632,6 +4632,8 @@ void clif_getareachar_unit(struct map_session_data* sd,struct block_list *bl)
 				clif_specialeffect_single(bl,423,sd->fd);
 			else if( nd->size == SZ_MEDIUM )
 				clif_specialeffect_single(bl,421,sd->fd);
+			if (nd->vend.vends)
+				clif_showvendingboard(&nd->bl, nd->vend.vending, sd->fd);
 		}
 		break;
 	case BL_MOB:
