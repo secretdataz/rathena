@@ -2096,7 +2096,7 @@ int map_quit(struct map_session_data *sd) {
 
 	unit_remove_map_pc(sd,CLR_RESPAWN);
 
-	if( map[sd->bl.m].instance_id ) { // Avoid map conflicts and warnings on next login
+	if( map[sd->bl.m].instance_id || map[sd->bl.m].clone_id ) { // Avoid map conflicts and warnings on next login
 		int16 m;
 		struct point *pt;
 		if( map[sd->bl.m].save.map )
@@ -2729,6 +2729,132 @@ int map_delinstancemap(int m)
 	return 1;
 }
 
+/*==========================================
+ * Add a cloned map
+ *------------------------------------------*/
+int map_addclonemap(const char *name, const char *newname)
+{
+	int src_m = map_mapname2mapid(name);
+	int dst_m = -1, i;
+	size_t num_cell, size;
+
+	if(src_m < 0)
+		return -1;
+
+	if(strlen(name) >= MAP_NAME_LENGTH) {
+		// against buffer overflow
+		ShowError("map_addclonemap: can't add long map name \"%s\"\n", name);
+		return -2;
+	}
+
+	if(strlen(newname) >= MAP_NAME_LENGTH) {
+		// against buffer overflow
+		ShowError("map_addclonemap: can't add long map name \"%s\"\n", newname);
+		return -2;
+	}
+
+	for(i = instance_start; i < MAX_MAP_PER_SERVER; i++) {
+		if(!map[i].name[0])
+			break;
+	}
+	if(i < map_num) // Destination map value overwrites another
+		dst_m = i;
+	else if(i < MAX_MAP_PER_SERVER) // Destination map value increments to new map
+		dst_m = map_num++;
+	else {
+		// Out of bounds
+		ShowError("map_addclonemap failed. map_num(%d) > map_max(%d)\n",map_num, MAX_MAP_PER_SERVER);
+		return -3;
+	}
+
+	if (map[src_m].clone_id) {
+		ShowError("map_addclonemap failed. Cannot clone a cloned map.\n",map_num, MAX_MAP_PER_SERVER);
+		return -4;
+	}
+
+	// Copy the map
+	memcpy(&map[dst_m], &map[src_m], sizeof(struct map_data));
+
+	// Alter the name
+	// Due to this being custom we only worry about preserving as many characters as necessary for accurate map distinguishing
+	// This also allows us to maintain complete independence with main map functions
+	strncpy(map[dst_m].name,newname,MAP_NAME_LENGTH);
+
+	map[dst_m].m = dst_m;
+	map[dst_m].clone_id = src_m;
+	map[dst_m].users = 0;
+
+	memset(map[dst_m].npc, 0, sizeof(map[dst_m].npc));
+	map[dst_m].npc_num = 0;
+	
+	// Reallocate cells
+	num_cell = map[dst_m].xs * map[dst_m].ys;
+	CREATE( map[dst_m].cell, struct mapcell, num_cell );
+	memcpy( map[dst_m].cell, map[src_m].cell, num_cell * sizeof(struct mapcell) );
+
+	// Remove ontouch NPC cells
+	for (i = 0; i < num_cell; i++) {
+		map[dst_m].cell[i].npc = 0;
+	}
+
+	// Remove all mob spawners (these should not be copied over)
+	for (i = 0; i < MAX_MOB_LIST_PER_MAP; i++) {
+		map[dst_m].moblist[i] = NULL;
+	}
+
+	// Do not copy PVP nightmare drops
+	memset(map[dst_m].drop_list, 0, sizeof(map[dst_m].drop_list));
+
+	// Remove quest information from the map
+	map[dst_m].qi_data = NULL;
+
+	size = map[dst_m].bxs * map[dst_m].bys * sizeof(struct block_list*);
+	map[dst_m].block = (struct block_list **)aCalloc(1,size);
+	map[dst_m].block_mob = (struct block_list **)aCalloc(1,size);
+
+	map[dst_m].index = mapindex_addmap(-1, map[dst_m].name);
+	map[dst_m].channel = NULL;
+	map[dst_m].mob_delete_timer = INVALID_TIMER;
+
+	map_addmap2db(&map[dst_m]);
+
+	return dst_m;
+}
+/*==========================================
+ * Deleting a cloned map
+ *------------------------------------------*/
+int map_delclonemap(const char* mapname)
+{
+	int m = map_mapname2mapid(mapname);
+
+	if(m < 0 || map[m].instance_id || map[m].clone_id <= 0)
+		return 0;
+
+	// Kick everyone out
+	map_foreachinmap(map_instancemap_leave, m, BL_PC);
+
+	// Do the unit cleanup
+	map_foreachinmap(map_instancemap_clean, m, BL_ALL);
+
+	if( map[m].mob_delete_timer != INVALID_TIMER )
+		delete_timer(map[m].mob_delete_timer, map_removemobs_timer);
+
+	// Free memory
+	aFree(map[m].cell);
+	map[m].cell = NULL;
+	aFree(map[m].block);
+	map[m].block = NULL;
+	aFree(map[m].block_mob);
+	map[m].block_mob = NULL;
+	map_free_questinfo(m);
+
+	mapindex_removemap( map[m].index );
+	map_removemapdb(&map[m]);
+	memset(&map[m], 0x00, sizeof(map[0]));
+	map[m].mob_delete_timer = INVALID_TIMER;
+	return 1;
+}
+
 /*=========================================
  * Dynamic Mobs [Wizputer]
  *-----------------------------------------*/
@@ -2839,6 +2965,10 @@ void map_removemobs(int16 m)
  *------------------------------------------*/
 const char* map_mapid2mapname(int m)
 {
+	if (map[m].clone_id) { // Clone map check
+		return map[map[m].clone_id].name;
+	}
+
 	if (map[m].instance_id) { // Instance map check
 		struct instance_data *im = &instance_data[map[m].instance_id];
 

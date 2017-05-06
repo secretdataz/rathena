@@ -10355,7 +10355,7 @@ void clif_parse_LoadEndAck(int fd,struct map_session_data *sd)
 #endif
 
 		// Instances do not need their own channels
-		if( channel_config.map_tmpl.name != NULL && (channel_config.map_tmpl.opt&CHAN_OPT_AUTOJOIN) && !map[sd->bl.m].flag.chmautojoin && !map[sd->bl.m].instance_id )
+		if( channel_config.map_tmpl.name != NULL && (channel_config.map_tmpl.opt&CHAN_OPT_AUTOJOIN) && !map[sd->bl.m].flag.chmautojoin && !map[sd->bl.m].instance_id && !map[sd->bl.m].clone_id )
 			channel_mjoin(sd); //join new map
 	} else if (sd->guild && (battle_config.guild_notice_changemap == 2 || guild_notice))
 		clif_guild_notice(sd); // Displays at end

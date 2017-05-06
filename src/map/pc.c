@@ -5625,6 +5625,11 @@ bool pc_memo(struct map_session_data* sd, int pos)
 		pos = 0;
 	}
 
+	if( map[sd->bl.m].clone_id ) {
+		clif_displaymessage( sd->fd, "You cannot create a memo in this map." );
+		return false;
+	}
+
 	if( map[sd->bl.m].instance_id ) {
 		clif_displaymessage( sd->fd, msg_txt(sd,384) ); // You cannot create a memo in an instance.
 		return false;

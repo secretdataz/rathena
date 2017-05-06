@@ -9822,6 +9822,11 @@ BUILDIN_FUNC(savepoint)
 	y = script_getnum(st,4);
 	m = map_mapindex2mapid(map_idx);
 
+	if( map[m].clone_id ) {
+		ShowError("buildin_savepoint: You cannot create a savepoint on this map %s.\n", str);
+		return SCRIPT_CMD_FAILURE;
+	}
+
 	if (cid_pos == 7) {
 		int dx = script_getnum(st,5), dy = script_getnum(st,6),
 			x1 = x + dx, y1 = y + dy,

@@ -799,6 +799,11 @@ ACMD_FUNC(save)
 {
 	nullpo_retr(-1, sd);
 
+	if( map[sd->bl.m].clone_id ) {
+		clif_displaymessage(fd, "You cannot create a savepoint in this map.");
+		return 1;
+	}
+
 	if( map[sd->bl.m].instance_id ) {
 		clif_displaymessage(fd, msg_txt(sd,383)); // You cannot create a savepoint in an instance.
 		return 1;
@@ -5946,6 +5951,11 @@ ACMD_FUNC(autotrade) {
 		return -1;
 	}
 
+	if (map[sd->bl.m].clone_id) {
+		clif_displaymessage(fd, "You cannot use autotrade on cloned maps.");
+		return -1;
+	}
+
 	sd->state.autotrade = 1;
 	if (battle_config.autotrade_monsterignore)
 		sd->state.monster_ignore = 1;
@@ -9940,6 +9950,111 @@ ACMD_FUNC(adopt)
 	return -1;
 }
 
+/**
+ * Clones an existing map without having to reboot your server.
+ * Usage: @clonemap <source_map_name> <new_map_name>
+ * @author Tokeiburu
+ */
+ACMD_FUNC(clonemap)
+{
+	int res;
+	char map_name_cur[MAP_NAME_LENGTH_EXT];
+	char map_name_new[MAP_NAME_LENGTH_EXT];
+
+	memset(map_name_cur, '\0', sizeof(map_name_cur));
+	memset(map_name_new, '\0', sizeof(map_name_new));
+
+	if (!message || !*message || sscanf(message, "%15s %15s", map_name_cur, map_name_new) < 2) {
+		clif_displaymessage(fd, "Usage: @clonemap <source_map_name> <new_map_name>");
+		return -1;
+	}
+
+	if (map_mapname2mapid(map_name_cur) < 0) {
+		sprintf(atcmd_output, "Source map not found: %s", map_name_cur);
+		clif_displaymessage(fd, atcmd_output);
+		return -1;
+	}
+
+	if (map_mapname2mapid(map_name_new) >= 0) { // This will always show a warning in the console, but removing it is not worth the trouble.
+		sprintf(atcmd_output, "Destination map already exists: %s", map_name_new);
+		clif_displaymessage(fd, atcmd_output);
+		return -1;
+	}
+
+	if ((res = map_addclonemap(map_name_cur, map_name_new)) < 0) {
+		sprintf(atcmd_output, "Failed to create a new map, error: %d", res);
+		clif_displaymessage(fd, atcmd_output);
+		return -1;
+	}
+
+	sprintf(atcmd_output, "New map cloned (%s).", map_name_new);
+	clif_displaymessage(fd, atcmd_output);
+	return 0;
+}
+
+/**
+ * Removes a cloned map.
+ * Usage: @delmap <map_name>
+ * @author Tokeiburu
+ */
+ACMD_FUNC(delmap)
+{
+	int res;
+	int m;
+	char map_name[MAP_NAME_LENGTH_EXT];
+
+	memset(map_name, '\0', sizeof(map_name));
+
+	if (!message || !*message || sscanf(message, "%15s", map_name) < 1) {
+		clif_displaymessage(fd, "Usage: @delmap <map_name>");
+		return -1;
+	}
+
+	if ((m = map_mapname2mapid(map_name)) < 0) {
+		sprintf(atcmd_output, "Map not found: %s", map_name);
+		clif_displaymessage(fd, atcmd_output);
+		return -1;
+	}
+
+	if (map[m].clone_id == 0) {
+		clif_displaymessage(fd, "Only cloned maps can be removed.");
+		return -1;
+	}
+
+	if ((res = map_delclonemap(map_name)) != 1) {
+		sprintf(atcmd_output, "Failed to remove map: %s", map_name);
+		clif_displaymessage(fd, atcmd_output);
+		return -1;
+	}
+
+	sprintf(atcmd_output, "Cloned map removed (%s).", map_name);
+	clif_displaymessage(fd, atcmd_output);
+	return 0;
+}
+
+/**
+ * Lists all cloned maps.
+ * Usage: @clonemaplist
+ * @author Tokeiburu
+ */
+ACMD_FUNC(clonemaplist)
+{
+	int i;
+	int count = 0;
+
+	for (i = instance_start; i < MAX_MAP_PER_SERVER; i++) {
+		if (map[i].clone_id > 0) {
+			sprintf(atcmd_output, "%s (source: %s)", map[i].name, map[map[i].clone_id].name);
+			clif_displaymessage(fd, atcmd_output);
+			count++;
+		}
+	}
+
+	sprintf(atcmd_output, "Found %d cloned map(s).", count);
+	clif_displaymessage(fd, atcmd_output);
+	return 0;
+}
+
 #include "../custom/atcommand.inc"
 
 /**
@@ -10237,6 +10352,10 @@ void atcommand_basecommands(void) {
 		ACMD_DEF(adopt),
 		ACMD_DEF(agitstart3),
 		ACMD_DEF(agitend3),
+
+		ACMD_DEF(clonemap),
+		ACMD_DEF(delmap),
+		ACMD_DEF(clonemaplist),
 	};
 	AtCommandInfo* atcommand;
 	int i;
