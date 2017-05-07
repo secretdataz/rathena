@@ -3,6 +3,7 @@
 
 #include "../config/core.h"
 #include "core.h"
+#include "malloc.h"
 #include "mapindex.h"
 #include "mmo.h"
 #include "showmsg.h"
@@ -125,6 +126,28 @@ const char* mapindex_idx2name(unsigned short id, const char *func) {
 		return indexes[0].name; // dummy empty string so that the callee doesn't crash
 	}
 	return indexes[id].name;
+}
+
+static bool mapindex_read_duplicates(char* str[], int columns, int current) {
+	if (str[1][0] == '\0') {
+		ShowWarning("mapindex_read_duplicates: Empty destination map column on line %d.\n", current);
+		return false;
+	}
+	mapindex_addmap(-1, str[1]);
+	return true;
+}
+
+void mapindex_insertduplicateindices()
+{
+	size_t path_size = strlen(db_path) + strlen("/" DBIMPORT) + 1;
+	char* importpath = (char*)aMalloc(path_size);
+	
+	safesnprintf(importpath, path_size, "%s/%s", db_path, DBIMPORT);
+
+	sv_readdb(db_path, "map_duplicates.txt", ',', 2, 2, -1, &mapindex_read_duplicates, 0);
+	sv_readdb(importpath, "map_duplicates.txt", ',', 2, 2, -1, &mapindex_read_duplicates, 0);
+
+	aFree(importpath);
 }
 
 void mapindex_init(void) {

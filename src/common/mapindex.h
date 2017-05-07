@@ -68,4 +68,6 @@ void mapindex_check_mapdefault(const char *mapname);
 void mapindex_init(void);
 void mapindex_final(void);
 
+void mapindex_insertduplicateindices(void);
+
 #endif /* _MAPINDEX_H_ */

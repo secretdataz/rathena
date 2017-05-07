@@ -3063,6 +3063,7 @@ int do_init(int argc, char **argv)
 	//Read map indexes
 	runflag = CHARSERVER_ST_STARTING;
 	mapindex_init();
+	mapindex_insertduplicateindices();
 
 	// Init default value
 	CHAR_CONF_NAME =   "conf/char_athena.conf";

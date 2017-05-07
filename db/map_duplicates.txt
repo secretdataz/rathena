@@ -1,0 +1,4 @@
+// Duplicate maps database
+//
+// Structure of database:
+// <source map>,<destination map>

@@ -715,6 +715,7 @@ struct map_data {
 
 	// Clone map system
 	unsigned short clone_id;
+	bool static_clone;
 
 	/* rAthena Local Chat */
 	struct Channel *channel;
@@ -834,7 +835,7 @@ int map_delinstancemap(int m);
 
 // Clone map system
 int map_delclonemap(const char* mapname);
-int map_addclonemap(const char *name, const char *newname);
+int map_addclonemap(const char *name, const char *newname, bool newidx);
 
 // player to map session
 void map_addnickdb(int charid, const char* nick);

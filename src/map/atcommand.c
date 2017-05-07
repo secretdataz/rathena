@@ -799,7 +799,7 @@ ACMD_FUNC(save)
 {
 	nullpo_retr(-1, sd);
 
-	if( map[sd->bl.m].clone_id ) {
+	if( map[sd->bl.m].clone_id && !map[sd->bl.m].static_clone ) {
 		clif_displaymessage(fd, "You cannot create a savepoint in this map.");
 		return 1;
 	}
@@ -9981,7 +9981,7 @@ ACMD_FUNC(clonemap)
 		return -1;
 	}
 
-	if ((res = map_addclonemap(map_name_cur, map_name_new)) < 0) {
+	if ((res = map_addclonemap(map_name_cur, map_name_new, true)) < 0) {
 		sprintf(atcmd_output, "Failed to create a new map, error: %d", res);
 		clif_displaymessage(fd, atcmd_output);
 		return -1;

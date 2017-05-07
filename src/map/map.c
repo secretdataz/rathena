@@ -2732,7 +2732,7 @@ int map_delinstancemap(int m)
 /*==========================================
  * Add a cloned map
  *------------------------------------------*/
-int map_addclonemap(const char *name, const char *newname)
+int map_addclonemap(const char *name, const char *newname, bool newidx)
 {
 	int src_m = map_mapname2mapid(name);
 	int dst_m = -1, i;
@@ -2782,6 +2782,7 @@ int map_addclonemap(const char *name, const char *newname)
 
 	map[dst_m].m = dst_m;
 	map[dst_m].clone_id = src_m;
+	map[dst_m].static_clone = false;
 	map[dst_m].users = 0;
 
 	memset(map[dst_m].npc, 0, sizeof(map[dst_m].npc));
@@ -2812,7 +2813,11 @@ int map_addclonemap(const char *name, const char *newname)
 	map[dst_m].block = (struct block_list **)aCalloc(1,size);
 	map[dst_m].block_mob = (struct block_list **)aCalloc(1,size);
 
-	map[dst_m].index = mapindex_addmap(-1, map[dst_m].name);
+	if (newidx)
+		map[dst_m].index = mapindex_addmap(-1, map[dst_m].name);
+	else
+		map[dst_m].index = mapindex_name2idx(map[dst_m].name, "map_addclonemap");
+
 	map[dst_m].channel = NULL;
 	map[dst_m].mob_delete_timer = INVALID_TIMER;
 
@@ -2820,6 +2825,44 @@ int map_addclonemap(const char *name, const char *newname)
 
 	return dst_m;
 }
+
+static bool map_read_duplicates(char* str[], int columns, int current) {
+	int err;
+
+	if (str[0][0] == '\0') {
+		ShowError("map_read_duplicates: Empty source map in line %d, skipping.\n", current);
+		return false;
+	}
+	if (str[1][0] == '\0') {
+		ShowError("map_read_duplicates: Empty destination map in line %d, skipping.\n", current);
+		return false;
+	}
+
+	if ((err = map_addclonemap(str[0], str[1], false)) >= 0) {
+		map[err].static_clone = true;
+	}
+	else {
+		ShowWarning("map_read_duplicates: Failed to create a new map, error: %d.\n", err);
+		return false;
+	}
+
+	return true;
+}
+
+void map_addclonemaps()
+{
+	size_t path_size = strlen(db_path) + strlen("/" DBIMPORT) + 1;
+	char* importpath = (char*)aMalloc(path_size);
+
+	safesnprintf(importpath, path_size, "%s/%s", db_path, DBIMPORT);
+
+	mapindex_insertduplicateindices();
+	sv_readdb(db_path, "map_duplicates.txt", ',', 2, 2, -1, &map_read_duplicates, 0);
+	sv_readdb(importpath, "map_duplicates.txt", ',', 2, 2, -1, &map_read_duplicates, 0);
+
+	aFree(importpath);
+}
+
 /*==========================================
  * Deleting a cloned map
  *------------------------------------------*/
@@ -4876,6 +4919,7 @@ int do_init(int argc, char *argv[])
 		grfio_init(GRF_PATH_FILENAME);
 
 	map_readallmaps();
+	map_addclonemaps();
 
 	add_timer_func_list(map_freeblock_timer, "map_freeblock_timer");
 	add_timer_func_list(map_clearflooritem_timer, "map_clearflooritem_timer");
