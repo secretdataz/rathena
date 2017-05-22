@@ -774,14 +774,14 @@ int inter_party_parse_frommap(int fd)
 {
 	RFIFOHEAD(fd);
 	switch(RFIFOW(fd,0)) {
-	case 0x3020: mapif_parse_CreateParty(fd, (char*)RFIFOP(fd,4), RFIFOB(fd,28), RFIFOB(fd,29), (struct party_member*)RFIFOP(fd,30)); break;
+	case 0x3020: mapif_parse_CreateParty(fd, RFIFOCP(fd,4), RFIFOB(fd,28), RFIFOB(fd,29), (struct party_member*)RFIFOP(fd,30)); break;
 	case 0x3021: mapif_parse_PartyInfo(fd, RFIFOL(fd,2), RFIFOL(fd,6)); break;
 	case 0x3022: mapif_parse_PartyAddMember(fd, RFIFOL(fd,4), (struct party_member*)RFIFOP(fd,8)); break;
 	case 0x3023: mapif_parse_PartyChangeOption(fd, RFIFOL(fd,2), RFIFOL(fd,6), RFIFOW(fd,10), RFIFOW(fd,12)); break;
-	case 0x3024: mapif_parse_PartyLeave(fd, RFIFOL(fd,2), RFIFOL(fd,6), RFIFOL(fd,10), (char *)RFIFOP(fd,14), (enum e_party_member_withdraw)RFIFOB(fd,14+NAME_LENGTH)); break;
+	case 0x3024: mapif_parse_PartyLeave(fd, RFIFOL(fd,2), RFIFOL(fd,6), RFIFOL(fd,10), RFIFOCP(fd,14), (enum e_party_member_withdraw)RFIFOB(fd,14+NAME_LENGTH)); break;
 	case 0x3025: mapif_parse_PartyChangeMap(fd, RFIFOL(fd,2), RFIFOL(fd,6), RFIFOL(fd,10), RFIFOW(fd,14), RFIFOB(fd,16), RFIFOW(fd,17)); break;
 	case 0x3026: mapif_parse_BreakParty(fd, RFIFOL(fd,2)); break;
-	case 0x3027: mapif_parse_PartyMessage(fd, RFIFOL(fd,4), RFIFOL(fd,8), (char*)RFIFOP(fd,12), RFIFOW(fd,2)-12); break;
+	case 0x3027: mapif_parse_PartyMessage(fd, RFIFOL(fd,4), RFIFOL(fd,8), RFIFOCP(fd,12), RFIFOW(fd,2)-12); break;
 	case 0x3029: mapif_parse_PartyLeaderChange(fd, RFIFOL(fd,2), RFIFOL(fd,6), RFIFOL(fd,10)); break;
 	case 0x302A: mapif_parse_PartyShareLevel(fd, RFIFOL(fd,2)); break;
 	default:
@@ -888,4 +888,30 @@ int inter_party_CharOffline(uint32 char_id, int party_id) {
 		//Parties don't have any data that needs be saved at this point... so just remove it from memory.
 		idb_remove(party_db_, party_id);
 	return 1;
+}
+
+int inter_party_charname_changed(int party_id, uint32 char_id, char *name)
+{
+	struct party_data* p = NULL;
+	int i;
+
+	p = inter_party_fromsql(party_id);
+	if( p == NULL || p->party.party_id == 0 )
+	{
+		ShowError("inter_party_charname_changed: Can't find party %d.\n", party_id);
+		return 0;
+	}
+
+	ARR_FIND(0, MAX_PARTY, i, p->party.member[i].char_id == char_id);
+	if( i == MAX_PARTY )
+	{
+		ShowError("inter_party_charname_changed: Can't find character %d in party %d.\n", char_id, party_id);
+		return 0;
+	}
+
+	safestrncpy(p->party.member[i].name, name, NAME_LENGTH);
+
+	mapif_party_info(-1, &p->party, char_id);
+	
+	return 0;
 }

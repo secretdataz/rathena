@@ -231,9 +231,13 @@ static void party_check_state(struct party_data *p)
 			case JOB_MONK:
 			case JOB_BABY_MONK:
 			case JOB_CHAMPION:
+			case JOB_SURA:
+			case JOB_SURA_T:
+			case JOB_BABY_SURA:
 				p->state.monk = 1;
 			break;
 			case JOB_STAR_GLADIATOR:
+			case JOB_BABY_STAR_GLADIATOR:
 				p->state.sg = 1;
 			break;
 			case JOB_SUPER_NOVICE:
@@ -243,6 +247,7 @@ static void party_check_state(struct party_data *p)
 				p->state.snovice = 1;
 			break;
 			case JOB_TAEKWON:
+			case JOB_BABY_TAEKWON:
 				p->state.tk = 1;
 			break;
 		}
@@ -259,6 +264,7 @@ int party_recv_info(struct party* sp, uint32 char_id)
 	int added[MAX_PARTY];// member_id in new data
 	int added_count = 0;
 	int member_id;
+	bool rename = false;
 
 	nullpo_ret(sp);
 
@@ -279,6 +285,9 @@ int party_recv_info(struct party* sp, uint32 char_id)
 
 			if( i == MAX_PARTY )
 				removed[removed_count++] = member_id;
+			// If the member already existed, compare the old to the (possible) new name
+			else if( !rename && strcmp(member->name,sp->member[i].name) )
+				rename = true;
 		}
 
 		for( member_id = 0; member_id < MAX_PARTY; ++member_id ) {
@@ -332,7 +341,7 @@ int party_recv_info(struct party* sp, uint32 char_id)
 		if( sd == NULL )
 			continue;// not online
 
-		clif_charnameupdate(sd); //Update other people's display. [Skotlex]
+		clif_name_area(&sd->bl); //Update other people's display. [Skotlex]
 		clif_party_member_info(p,sd);
 		// Only send this on party creation, otherwise it will be sent by party_send_movemap [Lemongrass]
 		if( sd->party_creating ){
@@ -342,6 +351,11 @@ int party_recv_info(struct party* sp, uint32 char_id)
 
 		if( p->instance_id != 0 )
 			instance_reqinfo(sd,p->instance_id);
+	}
+	
+	// If a player was renamed, make sure to resend the party information
+	if( rename ){
+		clif_party_info(p,NULL);
 	}
 
 	if( char_id != 0 ) { // requester
@@ -430,6 +444,14 @@ int party_reply_invite(struct map_session_data *sd,int party_id,int flag)
 	struct party_member member;
 
 	if( sd->party_invite != party_id ) { // forged
+		sd->party_invite = 0;
+		sd->party_invite_account = 0;
+		return 0;
+	}
+
+	// The character is already in a party, possibly left a party invite open and created his own party
+	if( sd->status.party_id != 0 ){
+		// On Aegis no rejection packet is sent to the inviting player
 		sd->party_invite = 0;
 		sd->party_invite_account = 0;
 		return 0;
@@ -528,7 +550,7 @@ int party_member_added(int party_id,uint32 account_id,uint32 char_id, int flag)
 
 	clif_party_hp(sd);
 	clif_party_xy(sd);
-	clif_charnameupdate(sd); //Update char name's display [Skotlex]
+	clif_name_area(&sd->bl); //Update char name's display [Skotlex]
 
 	if( p->instance_id )
 		instance_reqinfo(sd,p->instance_id);
@@ -635,11 +657,11 @@ int party_member_withdraw(int party_id, uint32 account_id, uint32 char_id, char 
 		j = pc_bound_chk(sd,BOUND_PARTY,idxlist);
 
 		for(i = 0; i < j; i++)
-			pc_delitem(sd,idxlist[i],sd->status.inventory[idxlist[i]].amount,0,1,LOG_TYPE_BOUND_REMOVAL);
+			pc_delitem(sd,idxlist[i],sd->inventory.u.items_inventory[idxlist[i]].amount,0,1,LOG_TYPE_BOUND_REMOVAL);
 #endif
 
 		sd->status.party_id = 0;
-		clif_charnameupdate(sd); //Update name display [Skotlex]
+		clif_name_area(&sd->bl); //Update name display [Skotlex]
 		//TODO: hp bars should be cleared too
 
 		if( p->instance_id ) {
@@ -779,6 +801,11 @@ int party_changeleader(struct map_session_data *sd, struct map_session_data *tsd
 		ARR_FIND( 0, MAX_PARTY, tmi, p->data[tmi].sd == tsd);
 		if (tmi == MAX_PARTY)
 			return 0; // Shouldn't happen
+
+		if (battle_config.change_party_leader_samemap && p->party.member[mi].map != p->party.member[tmi].map) {
+			clif_msg(sd, PARTY_MASTER_CHANGE_SAME_MAP);
+			return 0;
+		}
 	} else {
 		ARR_FIND(0,MAX_PARTY,mi,p->party.member[mi].leader);
 
