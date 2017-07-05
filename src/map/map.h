@@ -680,6 +680,7 @@ struct map_data {
 		unsigned nomineeffect : 1; //allow /mineeffect
 		unsigned nolockon : 1;
 		unsigned notomb : 1;
+		unsigned afk : 1; // [secretdataz]
 		unsigned nocostume : 1; // Disable costume sprites [Cydh]
 		unsigned gvg_te : 1; // GVG WOE:TE. This was added as purpose to change 'gvg' for GVG TE, so item_noequp, skill_nocast exlude GVG TE maps from 'gvg' (flag &4)
 		unsigned gvg_te_castle : 1; // GVG WOE:TE Castle

@@ -9129,6 +9129,45 @@ ACMD_FUNC(accinfo) {
 	return 0;
 }
 
+/*==========================================
+* @afk
+* Initial release by Axl, Rebel
+* Additional configurations by Secret
+*------------------------------------------*/
+ACMD_FUNC(afk) {
+	nullpo_retr(-1, sd);
+		
+	if( pc_isdead(sd) ) {
+		clif_displaymessage(fd, "You can't use @afk if you are dead.");
+		return -1;
+	}
+
+	if( map[sd->bl.m].flag.afk == battle_config.afk_mapflag ) // Add afk mapflag support [secretdataz]
+	{
+		if(map[sd->bl.m].flag.pvp  || map[sd->bl.m].flag.gvg){
+			clif_displaymessage(fd, "You can't use @afk in PVP or GVG map.");
+			return -1;
+		}
+
+		sd->state.autotrade = 1;
+		if(battle_config.afk_battleignore)
+			sd->state.monster_ignore = 1;
+		pc_setsit(sd);
+		skill_sit(sd,1);
+		clif_sitting(&sd->bl);
+		if(battle_config.afk_viewid)
+			clif_changelook(&sd->bl,LOOK_HEAD_TOP,battle_config.afk_viewid);                       
+		if( battle_config.afk_timeout )
+		{
+			int timeout = atoi(message);
+			status_change_start(NULL, &sd->bl, SC_AUTOTRADE, 10000,0,0,0,0, ((timeout > 0) ? min(timeout,battle_config.afk_timeout) : battle_config.afk_timeout)*60000,0);
+		}
+		clif_authfail_fd(fd, 15);
+	} else
+		clif_displaymessage(fd, "@afk is not allowed on this map.");
+	return 0;
+}
+
 /**
  * @set <variable name{[index]}>{ <value>}
  * 
@@ -10236,6 +10275,7 @@ void atcommand_basecommands(void) {
 		ACMD_DEF(cloneequip),
 		ACMD_DEF(clonestat),
 		ACMD_DEF(bodystyle),
+		ACMD_DEF(afk),
 		ACMD_DEF(adopt),
 		ACMD_DEF(agitstart3),
 		ACMD_DEF(agitend3),
