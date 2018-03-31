@@ -22610,10 +22610,10 @@ BUILDIN_FUNC(costume)
 	TBL_PC *sd;
 
 	num = script_getnum(st, 2); // Equip Slot
-	sd = script_rid2sd(st);
 
-	if (sd == NULL)
+	if (!script_rid2sd(sd))
 		return SCRIPT_CMD_FAILURE;
+
 	if (equip_index_check(num))
 		i = pc_checkequip(sd, equip_bitmask[num]);
 	if (i < 0)
@@ -22660,8 +22660,7 @@ BUILDIN_FUNC(getcostumeitem)
 	TBL_PC *sd;
 	struct script_data *data;
 
-	sd = script_rid2sd(st);
-	if (sd == NULL)
+	if (!script_rid2sd(sd))
 	{	// No player attached.
 		script_pushint(st, 0);
 		return SCRIPT_CMD_SUCCESS;
