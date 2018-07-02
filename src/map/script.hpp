@@ -704,6 +704,11 @@ enum instance_info_type {
 	IIT_MAP
 };
 
+enum sellitem_filter_type {
+	SFT_TYPE,
+	SFT_ID,
+};
+
 enum vip_status_type {
 	VIP_STATUS_ACTIVE = 1,
 	VIP_STATUS_EXPIRE,

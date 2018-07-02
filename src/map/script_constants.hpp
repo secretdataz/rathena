@@ -5019,6 +5019,10 @@
 	script_set_constant("REFINE_MATERIAL_ID", 0, false, false);
 	script_set_constant("REFINE_ZENY_COST", 1, false, false);
 
+	/* SellItem mod */
+	export_constant(SFT_TYPE);
+	export_constant(SFT_ID);
+
 	/* NPC view ids */
 	// Special macro to strip the prefix 'JT_'
 	#define export_constant_npc(a) export_constant_offset(a,3)
