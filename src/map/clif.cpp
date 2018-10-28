@@ -3,11 +3,37 @@
 
 #include "clif.hpp"
 
-#include <cstdarg>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <ctime>
+#include "map.h"
+#include "chrif.h"
+#include "pc.h"
+#include "status.h"
+#include "npc.h"
+#include "itemdb.h"
+#include "chat.h"
+#include "trade.h"
+#include "storage.h"
+#include "script.h"
+#include "skill.h"
+#include "atcommand.h"
+#include "intif.h"
+#include "battle.h"
+#include "battleground.h"
+#include "mob.h"
+#include "party.h"
+#include "unit.h"
+#include "guild.h"
+#include "vending.h"
+#include "pet.h"
+#include "homunculus.h"
+#include "instance.h"
+#include "mercenary.h"
+#include "elemental.h"
+#include "log.h"
+#include "clif.h"
+#include "mail.h"
+#include "quest.h"
+#include "cashshop.h"
+#include "channel.h"
 
 #include "../common/cbasetypes.hpp"
 #include "../common/conf.hpp"
@@ -56,6 +82,12 @@
 #include "trade.hpp"
 #include "unit.hpp"
 #include "vending.hpp"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
+#include <time.h>
 
 /* for clif_clearunit_delayed */
 static struct eri *delay_clearunit_ers;
@@ -19923,6 +19955,53 @@ void clif_hat_effect_single( struct map_session_data* sd, uint16 effectId, bool 
 #endif
 }
 
+void clif_sellitem(struct map_session_data* sd, enum sellitem_filter_type type, int param, bool discount) {
+	int fd, i, c = 0, val;
+
+	nullpo_retv(sd);
+
+	fd = sd->fd;
+	WFIFOHEAD(fd, MAX_INVENTORY * 10 + 4);
+	WFIFOW(fd, 0) = 0xc7;
+	for (i = 0; i < MAX_INVENTORY; i++)
+	{
+		if (sd->inventory.u.items_inventory[i].nameid > 0 && sd->inventory_data[i])
+		{
+			switch (type) {
+			case SFT_TYPE:
+				if (!(1 << (itemdb_type(sd->inventory.u.items_inventory[i].nameid))&param))
+					continue;
+				break;
+			case SFT_ID:
+				if (sd->inventory.u.items_inventory[i].nameid != param)
+					continue;
+				break;
+			default:
+				ShowWarning("clif_sellitem: Unknown filter %d passed to clif_sellitem.\n", type);
+				break;
+			}
+
+			if (!itemdb_cansell(&sd->inventory.u.items_inventory[i], pc_get_group_level(sd)))
+				continue;
+
+			if (sd->inventory.u.items_inventory[i].expire_time)
+				continue; // Cannot Sell Rental Items
+
+			if (sd->inventory.u.items_inventory[i].bound && !pc_can_give_bounded_items(sd))
+				continue; // Don't allow sale of bound items
+
+			val = sd->inventory_data[i]->value_sell;
+			if (val < 0)
+				continue;
+			WFIFOW(fd, 4 + c * 10) = i + 2;
+			WFIFOL(fd, 6 + c * 10) = val;
+			WFIFOL(fd, 10 + c * 10) = discount ? pc_modifysellvalue(sd, val) : val;
+			c++;
+		}
+	}
+	WFIFOW(fd, 2) = c * 10 + 4;
+	WFIFOSET(fd, WFIFOW(fd, 2));
+}
 
 /// Notify the client that a sale has started
 /// 09b2 <item id>.W <remaining time>.L (ZC_NOTIFY_BARGAIN_SALE_SELLING)

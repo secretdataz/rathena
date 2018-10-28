@@ -22854,128 +22854,42 @@ BUILDIN_FUNC(openstorage2) {
 }
 
 /**
- * Create a new channel
- * channel_create "<chname>","<alias>"{,"<password>"{<option>{,<delay>{,<color>{,<char_id>}}}}};
- * @author [Cydh]
+ * sellitem "<shopname">,<type>,<param>{,<overcharge>};
+ * type @see enum e_sellitem_filter_type
  **/
-BUILDIN_FUNC(channel_create) {
-	struct Channel tmp_chan, *ch = NULL;
-	const char *chname = script_getstr(st,2), *pass = NULL;
-	int i = channel_chk((char*)chname, NULL, 3);
-	TBL_PC *sd = NULL;
+BUILDIN_FUNC(sellitem) {
+	struct map_session_data* sd = NULL;
+	struct npc_data* nd;
+	const char* shop;
+	int type, param;
+	bool discount = false;
 
-	if (i != 0) {
-		ShowError("buildin_channel_create: Channel name '%s' is invalid. Errno %d\n", chname, i);
-		script_pushint(st,i);
+	sd = script_rid2sd(st);
+	nullpo_retr(SCRIPT_CMD_FAILURE, sd);
+
+	shop = script_getstr(st, 2);
+	type = script_getnum(st, 3);
+	param = script_getnum(st, 4);
+	nd = npc_name2id(shop);
+	if (!nd || nd->bl.type != BL_NPC || nd->subtype != NPCTYPE_SHOP) {
+		ShowError("buildin_sellitem: Shop %s not found or NPC is not a shop.\n", shop);
+		script_pushint(st, 0);
 		return SCRIPT_CMD_FAILURE;
 	}
 
-	memset(&tmp_chan, 0, sizeof(struct Channel));
-
-	if (script_hasdata(st,8)) {
-		tmp_chan.char_id = script_getnum(st,8);
-		if (!(sd = map_charid2sd(tmp_chan.char_id))) {
-			ShowError("buildin_channel_create: Player with char id '%d' is not found.\n", tmp_chan.char_id);
-			script_pushint(st,-5);
-			return SCRIPT_CMD_FAILURE;
-		}
-		tmp_chan.type = CHAN_TYPE_PRIVATE;
-		i = 1;
-	}
-	else {
-		tmp_chan.type = CHAN_TYPE_PUBLIC;
-		i = 0;
-	}
-
-	safestrncpy(tmp_chan.name, chname+1, sizeof(tmp_chan.name));
-	safestrncpy(tmp_chan.alias, script_getstr(st,3), sizeof(tmp_chan.alias));
-	if (script_hasdata(st,4) && (pass = script_getstr(st,4)) && strcmpi(pass,"null") != 0)
-		safestrncpy(tmp_chan.pass, pass, sizeof(tmp_chan.pass));
-	if (script_hasdata(st,5))
-		tmp_chan.opt = script_getnum(st,5);
-	else
-		tmp_chan.opt = i ? channel_config.private_channel.opt : CHAN_OPT_BASE;
-	if (script_hasdata(st,6))
-		tmp_chan.msg_delay = script_getnum(st,6);
-	else
-		tmp_chan.msg_delay = i ? channel_config.private_channel.delay : 1000;
-	if (script_hasdata(st,7))
-		tmp_chan.color = script_getnum(st,7);
-	else
-		tmp_chan.color = i ? channel_config.private_channel.color : channel_getColor("Default");
-
-	if (!(ch = channel_create(&tmp_chan))) {
-		ShowError("buildin_channel_create: Cannot create channel '%s'.\n", chname);
-		script_pushint(st,0);
-		return SCRIPT_CMD_FAILURE;
-	}
-	if (tmp_chan.char_id)
-		channel_join(ch, sd);
-	script_pushint(st,1);
-	return SCRIPT_CMD_SUCCESS;
-}
-
-/**
- * Set channel option
- * channel_setopt "<chname>",<option>,<value>;
- * @author [Cydh]
- **/
-BUILDIN_FUNC(channel_setopt) {
-	struct Channel *ch = NULL;
-	const char *chname = script_getstr(st,2);
-	int opt = script_getnum(st,3), value = script_getnum(st,4);
-
-	if (!(ch = channel_name2channel((char *)chname, NULL, 0))) {
-		ShowError("buildin_channel_setopt: Channel name '%s' is invalid.\n", chname);
-		script_pushint(st,0);
+	if (nd->sc.option & OPTION_INVISIBLE) {
+		ShowError("buildin_sellitem: Attempted to sell item to invisible NPC %s.\n", shop);
+		script_pushint(st, 0);
 		return SCRIPT_CMD_FAILURE;
 	}
 
-	switch (opt) {
-		case CHAN_OPT_ANNOUNCE_SELF:
-		case CHAN_OPT_ANNOUNCE_JOIN:
-		case CHAN_OPT_ANNOUNCE_LEAVE:
-		case CHAN_OPT_COLOR_OVERRIDE:
-		case CHAN_OPT_CAN_CHAT:
-		case CHAN_OPT_CAN_LEAVE:
-		case CHAN_OPT_AUTOJOIN:
-			if (value)
-				ch->opt |= opt;
-			else
-				ch->opt &= ~opt;
-			break;
-		case CHAN_OPT_MSG_DELAY:
-			ch->msg_delay = value;
-			break;
-		default:
-			ShowError("buildin_channel_setopt: Invalid option %d!\n", opt);
-			script_pushint(st,0);
-			return SCRIPT_CMD_FAILURE;
-	}
+	if (script_hasdata(st, 5))
+		discount = script_getnum(st, 5);
 
-	script_pushint(st,1);
-	return SCRIPT_CMD_SUCCESS;
-}
+	sd->npc_shopid = nd->bl.id;
+	clif_sellitem(sd, type, param, discount);
 
-/**
- * Set channel color
- * channel_setcolor "<chname>",<color>;
- * @author [Cydh]
- **/
-BUILDIN_FUNC(channel_setcolor) {
-	struct Channel *ch = NULL;
-	const char *chname = script_getstr(st,2);
-	int color = script_getnum(st,3);
-
-	if (!(ch = channel_name2channel((char *)chname, NULL, 0))) {
-		ShowError("buildin_channel_setcolor: Channel name '%s' is invalid.\n", chname);
-		script_pushint(st,0);
-		return SCRIPT_CMD_FAILURE;
-	}
-
-	ch->color = (color & 0x0000FF) << 16 | (color & 0x00FF00) | (color & 0xFF0000) >> 16;//RGB to BGR
-
-	script_pushint(st,1);
+	script_pushint(st, 1);
 	return SCRIPT_CMD_SUCCESS;
 }
 
