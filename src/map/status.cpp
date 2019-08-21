@@ -14464,8 +14464,6 @@ int status_get_refine_chance(enum refine_type wlv, int refine, bool enriched)
 		return 0;
 	
 	int type = enriched ? 1 : 0;
-	if (battle_config.event_refine_chance)
-		type |= 2;
 
 	return refine_info[wlv].chance[type][refine];
 }
