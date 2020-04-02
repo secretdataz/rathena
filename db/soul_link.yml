@@ -1,0 +1,71 @@
+# Custom soul link buffs.
+# Author: Secret <Secret@rathena.org>
+#
+# Format
+# <SL_ constant>: <YAML string literal with a pair of enclosing bracket for the script>
+#
+# You can code the script just like an item script.
+#
+# Use ONLY spaces to indent.
+# DONT USE TABS
+
+SL_ALCHEMIST: |
+    {
+        bonus bStr,1;
+    }
+SL_MONK: |
+    {
+        bonus bStr,1;
+    }
+SL_STAR: |
+    {
+        bonus bStr,1;
+    }
+SL_SAGE: |
+    {
+        bonus bStr,1;
+    }
+SL_CRUSADER: |
+    {
+        bonus bStr,1;
+    }
+SL_SUPERNOVICE: |
+    {
+        bonus bStr,1;
+    }
+SL_KNIGHT: |
+    {
+        bonus bStr,1;
+    }
+SL_WIZARD: |
+    {
+        bonus bStr,1;
+    }
+SL_PRIEST: |
+    {
+        bonus bStr,1;
+    }
+SL_BARDDANCER: |
+    {
+        bonus bStr,1;
+    }
+SL_ROGUE: |
+    {
+        bonus bStr,1;
+    }
+SL_ASSASIN: |
+    {
+        bonus bStr,1;
+    }
+SL_BLACKSMITH: |
+    {
+        bonus bStr,1;
+    }
+SL_HUNTER: |
+    {
+        bonus bStr,1;
+    }
+SL_SOULLINKER: |
+    {
+        bonus bStr,1;
+    }

@@ -16,6 +16,23 @@
 	export_constant(INT_MIN);
 	export_constant(INT_MAX);
 
+	/* soul links */
+	export_constant(SL_ALCHEMIST);
+	export_constant(SL_MONK);
+	export_constant(SL_STAR);
+	export_constant(SL_SAGE);
+	export_constant(SL_CRUSADER);
+	export_constant(SL_SUPERNOVICE);
+	export_constant(SL_KNIGHT);
+	export_constant(SL_WIZARD);
+	export_constant(SL_PRIEST);
+	export_constant(SL_BARDDANCER);
+	export_constant(SL_ROGUE);
+	export_constant(SL_ASSASIN);
+	export_constant(SL_BLACKSMITH);
+	export_constant(SL_HUNTER);
+	export_constant(SL_SOULLINKER);
+
 	/* server defines */
 	export_constant(PACKETVER);
 	export_constant(MAX_LEVEL);

@@ -7,6 +7,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string>
+#include <unordered_map>
 #include <yaml-cpp/yaml.h>
 
 #include "../common/cbasetypes.hpp"
@@ -64,6 +65,8 @@ unsigned int current_equip_combo_pos; /// For combo items we need to save the po
 int current_equip_card_id; /// To prevent card-stacking (from jA) [Skotlex]
 // We need it for new cards 15 Feb 2005, to check if the combo cards are insrerted into the CURRENT weapon only to avoid cards exploits
 short current_equip_opt_index; /// Contains random option index of an equipped item. [Secret]
+
+std::unordered_map<int, script_code*> soul_link;
 
 unsigned int SCDisabled[SC_MAX]; ///< List of disabled SC on map zones. [Cydh]
 
@@ -4165,6 +4168,13 @@ int status_calc_pc_sub(struct map_session_data* sd, enum e_status_calc_opt opt)
 			}
 		}
 		current_equip_opt_index = -1;
+	}
+
+	if (sd && sc->count && sc->data[SC_SPIRIT]) {
+		auto spirit = sc->data[SC_SPIRIT];
+		if (spirit != nullptr && soul_link.find(spirit->val2) != soul_link.end() && soul_link[spirit->val2] != nullptr) {
+			run_script(soul_link[spirit->val2], 0, sd->bl.id, 0);
+		}
 	}
 
 	if (sc->count && sc->data[SC_ITEMSCRIPT]) {
@@ -15682,6 +15692,53 @@ static bool status_readdb_attrfix(const char *basedir,bool silent)
 	return true;
 }
 
+void status_read_soullink_db(char* file_name) {
+	YAML::Node root;
+	int count = 0;
+	try {
+		root = YAML::LoadFile(file_name);
+		if (root.IsMap()) {
+			for (auto node : root) {
+				struct script_code *code;
+				std::string key = node.first.as<std::string>();
+				int64 constant = 0;
+				if (key.compare(0, 3, "SL_")) {
+					ShowWarning("status_read_soullink_db: Expected a constant with SL_ prefix, got %s.\n", key.c_str());
+					continue;
+				}
+				if (!script_get_constant(key.c_str(), &constant)) {
+					ShowWarning("status_read_soullink_db: Tried to assign custom buff to nonexistent constant %s.\n", key.c_str());
+					continue;
+				}
+				if ((code = parse_script(node.second.as<std::string>().c_str(), file_name, node.second.Mark().line, 0)) == NULL) {
+					ShowWarning("status_read_soullink_db: Invalid or empty script on custom soul link %s.\n", key.c_str());
+					continue;
+				}
+				if (soul_link[constant] != nullptr)
+					script_free_code(soul_link[constant]);
+				soul_link[constant] = code;
+				count++;
+			}
+		}
+		else {
+			ShowError("status_read_soullink_db: The file's structure is broken. Root node is not a map.\n");
+		}
+	}
+	catch (...) {
+		ShowError("status_read_soullink_db: Cannot load custom soul link buffs from %s.\n", file_name);
+	}
+
+	ShowInfo("status_read_soullink_db: Done reading %d custom soul links.\n", count);
+}
+
+void status_clear_soul_link_db()
+{
+	for (const auto& entry : soul_link) {
+		script_free_code(entry.second);
+	}
+	soul_link.clear();
+}
+
 /**
  * Sets defaults in tables and starts read db functions
  * sv_readdb reads the file, outputting the information line-by-line to
@@ -15748,6 +15805,7 @@ int status_readdb(void)
 
 	size_fix_db.load();
 
+	status_read_soullink_db("db/soul_link.yml");
 	return 0;
 }
 
@@ -15768,5 +15826,6 @@ int do_init_status(void)
 }
 void do_final_status(void)
 {
+	status_clear_soul_link_db();
 	ers_destroy(sc_data_ers);
 }
