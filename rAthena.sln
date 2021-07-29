@@ -58,6 +58,7 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "map-server", "src\map\map-server.vcxproj", "{B4114A9C-EEA4-433C-A830-56119A984F24}"
 	ProjectSection(ProjectDependencies) = postProject
 		{F8FD7B1E-8E1C-4CC3-9CD1-2E28F77B6559} = {F8FD7B1E-8E1C-4CC3-9CD1-2E28F77B6559}
+		{58C4F49F-26DE-40B8-9E0A-116E39EB9E99} = {58C4F49F-26DE-40B8-9E0A-116E39EB9E99}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "common-minicore", "src\common\common-minicore.vcxproj", "{352B45B3-FE88-4431-9D89-48CF811446DB}"

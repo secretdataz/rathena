@@ -69,6 +69,9 @@ static void npc_market_fromsql(void);
 #define npc_market_clearfromsql(exname) (npc_market_delfromsql_((exname), 0, true))
 #endif
 
+std::unordered_map<std::string, std::unique_ptr<lua::script_metadata>> lua_npc_metadata;
+std::unordered_map<int, npc_data*> lua_npcs;
+
 /// Returns a new npc id that isn't being used in id_db.
 /// Fatal error if nothing is available.
 int npc_get_new_npc_id(void) {
@@ -1392,6 +1395,13 @@ int npc_globalmessage(const char* name, const char* mes)
 	return 0;
 }
 
+void run_lua_script(struct map_session_data* sd, struct npc_data* nd)
+{
+	sd->npc_id = nd->bl.id;
+	sd->lua_executor = std::make_unique<lua::executor>(sd, nd);
+	sd->lua_executor->run(nd->lua.code.data(), nd->lua.code.size());
+}
+
 // MvP tomb [GreenBox]
 void run_tomb(struct map_session_data* sd, struct npc_data* nd)
 {
@@ -1477,6 +1487,9 @@ int npc_click(struct map_session_data* sd, struct npc_data* nd)
 		case NPCTYPE_TOMB:
 			run_tomb(sd,nd);
 			break;
+		case NPCTYPE_SCRIPTLUA:
+			run_lua_script(sd, nd);
+			break;
 	}
 
 	return 0;
@@ -1489,6 +1502,20 @@ bool npc_scriptcont(struct map_session_data* sd, int id, bool closing){
 	struct block_list *target = map_id2bl(id);
 
 	nullpo_retr(true, sd);
+
+	TBL_NPC* nd = (TBL_NPC*)map_id2bl(sd->npc_id);
+
+	if (nd && nd->subtype == NPCTYPE_SCRIPTLUA) {
+
+		if (closing) {
+			sd->npc_id = 0;
+			return true;
+		}
+		else {
+			sd->lua_executor->resume();
+			return true;
+		}
+	}
 
 #ifdef SECURE_NPCTIMEOUT
 	if( !closing && sd->npc_idle_timer == INVALID_TIMER && !sd->state.ignoretimeout )
@@ -2509,6 +2536,82 @@ static void npc_clearsrcfile(void)
 		aFree(file_tofree);
 	}
 	npc_src_files = NULL;
+}
+
+bool npc_addluanpc(const std::string& path)
+{
+	//Check if this is not a file
+	if (check_filepath(path.c_str()) != 2) {
+		ShowError("npc_addluanpc: Can't find source file \"%s\"\n", path.c_str());
+		return false;
+	}
+
+	// Check if the file is already in the container
+	if (lua_npc_metadata.find(path) != lua_npc_metadata.end()) {
+		ShowError("npc_addluanpc: Source file \"%s\" was already added.\n", path.c_str());
+		return false;
+	}
+
+	lua::interpreter interpreter;
+	std::unique_ptr<lua::script_metadata> metadata = interpreter.extract_metadata(path);
+
+	if (!metadata) {
+		ShowError("npc_addluanpc: Could not process the contents of the file \"%s\".\n", path.c_str());
+		return false;
+	}
+
+	lua_npc_metadata[path] = std::move(metadata);
+
+	return true;
+}
+
+void npc_loadluanpc()
+{
+	for (const auto& pair : lua_npc_metadata) {
+		const std::string& path = pair.first;
+		const std::unique_ptr<lua::script_metadata>& metadata = pair.second;
+
+		struct npc_data* nd = nullptr;
+		// this is probably bad
+		CREATE(nd, struct npc_data, 1);
+
+		nd->bl.id = npc_get_new_npc_id();
+		nd->ud.dir = metadata->facing;
+
+		int16 m = map_mapname2mapid(metadata->map.c_str());
+		int16 i = mapindex_name2id(metadata->map.c_str());
+		if (i == 0) {
+			ShowError("npc_loadluanpc: Unknown destination map in file '%s'\n", metadata->path.c_str());
+			return;
+		}
+
+		nd->bl.m = m;
+		nd->bl.x = metadata->x;
+		nd->bl.y = metadata->y;
+		nd->bl.type = BL_NPC;
+		safestrncpy(nd->name, metadata->name.c_str(), sizeof(nd->name));
+		nd->class_ = metadata->sprite;
+		nd->speed = 200;
+		nd->subtype = npc_subtype::NPCTYPE_SCRIPTLUA;
+
+		if (!metadata->code) {
+			ShowWarning("npc_loadluanpc: npc has no script!! file: '%s'\n", metadata->path.c_str());
+		} else {
+			nd->lua.code = std::move(metadata->code->bytes);
+		}
+
+		map_addnpc(nd->bl.m, nd);
+
+		if (map_addblock(&nd->bl)) {
+			ShowError("npc_loadluanpc: Could not add npc to map. file: '%s'\n", metadata->path.c_str());
+			return;
+		}
+
+		status_set_viewdata(&nd->bl, nd->class_);
+		status_change_init(&nd->bl);
+		unit_dataset(&nd->bl);
+		lua_npcs[nd->bl.id] = nd;
+	}
 }
 
 /**
@@ -4703,6 +4806,12 @@ void npc_clear_pathlist(void) {
 	dbi_destroy(path_list);
 }
 
+void npc_clearluametadata()
+{
+	lua_npc_metadata.clear();
+}
+
+
 //Clear then reload npcs files
 int npc_reload(void) {
 	struct npc_src_list *nsl;
@@ -4739,6 +4848,8 @@ int npc_reload(void) {
 		}
 	}
 	mapit_free(iter);
+
+	lua_npcs.clear();
 
 	// dynamic check by [random]
 	if( battle_config.dynamic_mobs ){
@@ -4778,6 +4889,9 @@ int npc_reload(void) {
 		ShowStatus("Loading NPC file: %s" CL_CLL "\r", nsl->name);
 		npc_parsesrcfile(nsl->name);
 	}
+
+	npc_loadluanpc();
+
 	ShowInfo ("Done loading '" CL_WHITE "%d" CL_RESET "' NPCs:" CL_CLL "\n"
 		"\t-'" CL_WHITE "%d" CL_RESET "' Warps\n"
 		"\t-'" CL_WHITE "%d" CL_RESET "' Shops\n"
@@ -4929,6 +5043,9 @@ void do_init_npc(void){
 		ShowStatus("Loading NPC file: %s" CL_CLL "\r", file->name);
 		npc_parsesrcfile(file->name);
 	}
+
+	npc_loadluanpc();
+
 	ShowInfo ("Done loading '" CL_WHITE "%d" CL_RESET "' NPCs:" CL_CLL "\n"
 		"\t-'" CL_WHITE "%d" CL_RESET "' Warps\n"
 		"\t-'" CL_WHITE "%d" CL_RESET "' Shops\n"

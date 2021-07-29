@@ -187,6 +187,8 @@
     <ClInclude Include="intif.hpp" />
     <ClInclude Include="itemdb.hpp" />
     <ClInclude Include="log.hpp" />
+    <ClInclude Include="lua_bridge.hpp" />
+    <ClInclude Include="lua_interpreter.hpp" />
     <ClInclude Include="mail.hpp" />
     <ClInclude Include="map.hpp" />
     <ClInclude Include="mapreg.hpp" />
@@ -232,6 +234,8 @@
     <ClCompile Include="intif.cpp" />
     <ClCompile Include="itemdb.cpp" />
     <ClCompile Include="log.cpp" />
+    <ClCompile Include="lua_bridge.cpp" />
+    <ClCompile Include="lua_interpreter.cpp" />
     <ClCompile Include="mail.cpp" />
     <ClCompile Include="map.cpp" />
     <ClCompile Include="mapreg.cpp" />

@@ -121,6 +121,15 @@ struct npc_data {
 		} tomb;
 	} u;
 
+	// I'm aware of the union above but i had headaches
+	// trying to define a destructor for a struct with
+	// an union that contains members with non-trivial
+	// destructors. This will do for now.
+	struct
+	{
+		std::vector<char> code;
+	} lua;
+
 	struct sc_display_entry **sc_display;
 	unsigned char sc_display_count;
 
@@ -1351,5 +1360,8 @@ void npc_market_delfromsql_(const char *exname, t_itemid nameid, bool clear);
 int npc_do_atcmd_event(struct map_session_data* sd, const char* command, const char* message, const char* eventname);
 
 bool npc_unloadfile( const char* path );
+
+bool npc_addluanpc(const std::string&);
+void npc_clearluametadata();
 
 #endif /* NPC_HPP */

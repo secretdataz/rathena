@@ -17,6 +17,7 @@
 #include "buyingstore.hpp" // struct s_buyingstore
 #include "clif.hpp" //e_wip_block
 #include "itemdb.hpp" // MAX_ITEMGROUP
+#include "lua_interpreter.hpp"
 #include "map.hpp" // RC_ALL
 #include "mob.hpp" //e_size
 #include "script.hpp" // struct script_reg, struct script_regstr
@@ -272,6 +273,10 @@ struct s_qi_display {
 	e_questinfo_types icon;
 	e_questinfo_markcolor color;
 };
+
+namespace lua {
+	class executor;
+}
 
 struct map_session_data {
 	struct block_list bl;
@@ -804,6 +809,8 @@ struct map_session_data {
 		uint16 level;
 		int target;
 	} skill_keep_using;
+
+	std::unique_ptr<lua::executor> lua_executor;
 };
 
 extern struct eri *pc_sc_display_ers; /// Player's SC display table

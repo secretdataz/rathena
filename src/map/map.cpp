@@ -4055,6 +4055,8 @@ int map_config_read(const char *cfgName)
 			map_delmap(w2);
 		else if (strcmpi(w1, "npc") == 0)
 			npc_addsrcfile(w2, false);
+		else if (strcmpi(w1, "lua_npc") == 0)
+			npc_addluanpc(w2);
 		else if (strcmpi(w1, "delnpc") == 0)
 			npc_delsrcfile(w2);
 		else if (strcmpi(w1, "autosave_time") == 0) {
@@ -4130,6 +4132,8 @@ void map_reloadnpc_sub(const char *cfgName)
 
 		if (strcmpi(w1, "npc") == 0)
 			npc_addsrcfile(w2, false);
+		else if (strcmpi(w1, "lua_npc") == 0)
+			npc_addluanpc(w2);
 		else if (strcmpi(w1, "delnpc") == 0)
 			npc_delsrcfile(w2);
 		else if (strcmpi(w1, "import") == 0)
@@ -4143,8 +4147,10 @@ void map_reloadnpc_sub(const char *cfgName)
 
 void map_reloadnpc(bool clear)
 {
-	if (clear)
+	if (clear) {
 		npc_addsrcfile("clear", false); // this will clear the current script list
+		npc_clearluametadata();
+	}
 
 #ifdef RENEWAL
 	map_reloadnpc_sub("npc/re/scripts_main.conf");
